@@ -19,5 +19,6 @@ fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojso
       const lat = terremoto.geometry.coordinates[1]
       const lng = terremoto.geometry.coordinates[0]
       const mag = terremoto.properties.mag
+      // ciao
     }
   })
