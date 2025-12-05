@@ -1,168 +1,117 @@
-import './style.css'
-import pb from './pocketbase.js'
+import './style.css';
+import pb, { autentificazione } from './pocketbase.js'; 
+import { fetchAndStoreData, KEY } from './data_fetcher.js';
+import { loadFromLocalStorage } from './localstorage.js';
 
-// --- Configurazione ---
-const collectionName = 'flight_data' // Nome della collezione
-const FLIGHT_API_URL = `https://opensky-network.org/api/states/all`
+const collectionName = 'opensky_states'; 
 
-// --- 1. Autenticazione ---
-// Assumendo che questa parte sia corretta e funzioni
-try {
-    const authData = await pb.collection("_superusers").authWithPassword('admin@admin.it', 'admin12345');
-    console.log(`Autenticazione valida: ${pb.authStore.isValid}`);
-    console.log(`ID Utente: ${pb.authStore.record.id}`);
-} catch (error) {
-    console.error("❌ Errore di autenticazione:", error);
-    // Interrompi l'esecuzione se l'autenticazione fallisce
-    throw new Error("Impossibile autenticarsi. Controlla le credenziali o lo stato del server PocketBase.");
-}
+const attributi = [
+    { name: 'icao24', type: 'text', required: true, unique: true }, 
+    { name: 'callsign', type: 'text' }, 
+    { name: 'origin_country', type: 'text' },
+    { name: 'latitudine', type: 'number' },
+    { name: 'longitudine', type: 'number' },
+    { name: 'altitudine_baro', type: 'number' }, 
+    { name: 'velocita', type: 'number' },
+    { name: 'rotta', type: 'number' } 
+];
 
-
-// --- 2. Gestione e Creazione della Collezione (Lasciamo intatto) ---
-// ... (le funzioni createFlightCollection e verifyAndCreateCollection sono qui)
-
-async function createFlightCollection() {
-    console.log(`Tentativo di creazione della collezione '${collectionName}'...`);
-    await pb.collections.create({
-        name: collectionName,
-        type: 'base',
-        schema: [
-            {
-                name: 'icao24', 
-                type: 'text',
-                required: true,
-                unique: true,
-                options: {
-                    max: 6 
-                }
-            },
-            {
-                name: 'latitude', 
-                type: 'number',
-                options: {
-                    min: -90,
-                    max: 90
-                }
-            },
-            {
-                name: 'longitude', 
-                type: 'number',
-                options: {
-                    min: -180,
-                    max: 180
-                }
-            },
-            {
-                name: 'callsign', 
-                type: 'text',
-            }
-        ],
-    });
-}
-
-async function verifyAndCreateCollection() {
-    try {
-        // Tenta di leggere la collezione
-        const collection = await pb.collections.getOne(collectionName); 
-        
-        console.log(`✅ Successo: La collezione '${collectionName}' esiste già.`);
-        
-        // CORREZIONE: Verifichiamo che 'schema' esista prima di chiamare .map()
-        if (collection && Array.isArray(collection.schema)) {
-            const fieldNames = collection.schema.map(f => f.name);
-            console.log(`Schema corrente della collezione (Campi trovati: ${fieldNames.length}):`, fieldNames);
-        } else {
-            console.warn("⚠️ Attenzione: La proprietà 'schema' non è presente o non è un array.");
-        }
-        
-        return true;
-
-    } catch (error) {
-        if (error.status === 404) {
-            // Se non trova (404), la crea
-            console.log(`⚠️ Attenzione: La collezione '${collectionName}' non è stata trovata. Procedo alla creazione...`);
-            await createFlightCollection(); 
-            console.log(`✅ Successo: Collezione '${collectionName}' creata con successo!`);
-            return true;
-        } else {
-            // Gestisce altri errori 
-            console.error("❌ Errore critico durante il controllo dell'esistenza:", error);
-            return false;
-        }
+// Recupera i dati dal localStorage e li sincronizza con PocketBase (UPSERT).
+async function DataFromStorageToPocketBase() {
+    const data = loadFromLocalStorage(KEY);
+    if (!data || !data.states) {
+        console.log("Nessun dato valido di aeromobili da sincronizzare trovato in localStorage.");
+        return;
     }
+
+    const states = data.states;
+    let upsertedCount = 0;
+    console.log(`\nInizio sincronizzazione di ${states.length} vettori di stato su PocketBase...`);
+
+    for (const state of states) {
+        const icao24 = state[0];
+        const callsign = state[1] ? state[1].trim() : "N/A"; 
+        const originCountry = state[2];
+        const longitude = state[5]; 
+        const latitude = state[6];  
+        const baroAltitude = state[13]; 
+        const velocity = state[9];
+        const heading = state[10];
+        
+        // Controllo essenziale: se mancano ICAO24 o la posizione, saltiamo il record.
+        if (!icao24 || longitude === null || latitude === null) {
+            continue; 
+        }
+
+        // Costruzione del payload per PocketBase
+        const payload = {
+            icao24: icao24,
+            callsign: callsign,
+            origin_country: originCountry,
+            latitudine: latitude,
+            longitudine: longitude,
+            altitudine_baro: baroAltitude,
+            velocita: velocity,
+            rotta: heading,
+        };
+
+        try {
+            const esisteRecord = await pb.collection(collectionName).getFirstListItem(`icao24="${icao24}"`);
+            await pb.collection(collectionName).update(esisteRecord.id, payload);
+        } catch (e) {
+            if (e.status === 404) {
+                await pb.collection(collectionName).create(payload);
+            } else {
+                console.error(`Errore durante l'UPSERT per ${icao24}:`, e.message);
+            }
+        }
+        upsertedCount++;
+    }
+    console.log(`\n✅ Sincronizzazione dati completata! Record processati: ${upsertedCount}`);
 }
 
+// Creazione/Verifica dello fields e inizializzazione
+async function createCollection() {
+    // IL FETCH SALVA I DATI NELLO STORAGE
+    const dataStored = await fetchAndStoreData();
+    if (!dataStored) {
+        console.warn("Impossibile procedere senza dati freschi in localStorage.");
+        return;
+    }
 
-// --- 3. 🆕 NUOVA LOGICA: Caricamento dei Dati ---
+    // AUTENTIFICAZIONE ADMIN
+    const autentifica = await autentificazione();
+    if (!autentifica) {
+        return;
+    }
 
-async function fetchAndInsertFlightData() {
-    console.log("Inizio del recupero dei dati di volo...");
-
+    // CREAZIONE/AGGIORNAMENTO DELLA COLLEZIONE
     try {
-        // a) Recupera i dati dall'API esterna
-        const response = await fetch(FLIGHT_API_URL);
-        if (!response.ok) {
-            throw new Error(`Errore HTTP! Status: ${response.status}`);
-        }
-        const flightData = await response.json(); // Assumi che ritorni un JSON
+        const existingCollection = await pb.collections.getOne(collectionName);
+        console.log(`\nCollezione '${collectionName}' ESISTE già. Verifico lo schema...`);
+        
+        // Aggiorna lo schema con i nuovi attributi 
+        await pb.collections.update(existingCollection.id, {
+            fields: attributi
+        });
+        console.log(`✅ Schema di '${collectionName}' aggiornato/verificato con successo.`);
 
-        // Assumi che i dati di volo siano in un array nella chiave 'flights'
-        const flights = flightData.flights || flightData; 
-
-        if (flights.length === 0) {
-            console.log("Nessun dato di volo da inserire.");
+    } catch (e) {
+        if (e.status === 404) {
+            console.log(`\nCollezione '${collectionName}' non trovata. Creazione...`);
+            await pb.collections.create({
+                name: collectionName,
+                type: 'base',
+                fields: attributi
+            });
+            console.log(`✅ Collezione '${collectionName}' creata con successo!`);
+        } else {
+            console.error("ERRORE CRITICO durante la gestione della collezione:", e.message);
             return;
         }
-
-        console.log(`Trovati ${flights.length} voli da inserire.`);
-        
-        let insertedCount = 0;
-
-        // b) Inserisce ogni record in PocketBase
-        for (const flight of flights) {
-            // Assicurati che i campi corrispondano allo schema della tua collezione
-            const dataToInsert = {
-                icao24: flight.icao24,
-                latitude: flight.latitude,
-                longitude: flight.longitude,
-                callsign: flight.callsign || '', // Usa una stringa vuota se callsign è assente
-            };
-
-            try {
-                // Tenta di creare un nuovo record
-                await pb.collection(collectionName).create(dataToInsert);
-                insertedCount++;
-            } catch (insertError) {
-                // Ignora errori di record duplicato (se hai impostato icao24 come 'unique')
-                if (insertError.data.data.icao24 && insertError.data.data.icao24.code === 'notUnique') {
-                    // Potresti voler aggiornare il record esistente qui invece di ignorarlo
-                    // Per semplicità, in questo esempio ignoriamo i duplicati
-                    // console.log(`Skipped duplicate: ${flight.icao24}`);
-                } else {
-                    console.error(`❌ Errore durante l'inserimento del volo ${flight.icao24}:`, insertError);
-                }
-            }
-        }
-        
-        console.log(`✅ Caricamento completato. Inseriti ${insertedCount} nuovi record.`);
-
-    } catch (error) {
-        console.error("❌ Errore durante il recupero o l'inserimento dei dati di volo:", error);
     }
-}
-
-
-// --- 4. 🚀 Esecuzione Principale Aggiornata ---
-
-async function initializeDataLoad() {
-    const isCollectionReady = await verifyAndCreateCollection();
     
-    if (isCollectionReady) {
-        await fetchAndInsertFlightData();
-    } else {
-        console.log("Non è possibile caricare i dati perché la collezione non è stata creata con successo.");
-    }
+    await DataFromStorageToPocketBase();
 }
 
-// Avvia l'intera sequenza: verifica/creazione e poi caricamento dati
-initializeDataLoad();
+createCollection();
