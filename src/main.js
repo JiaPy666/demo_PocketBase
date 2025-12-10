@@ -15,6 +15,7 @@ const lamax = 48.0;
 const lomin = 6.0;
 const lomax = 18.0;
 
+// Bottone aggiorna
 const btn = document.createElement('button');
 btn.textContent = 'AGGIORNA';
 btn.style.position = 'absolute';
@@ -31,7 +32,7 @@ btn.style.fontFamily = 'sans-serif';
 btn.style.fontSize = '14px';
 document.body.appendChild(btn);
 
-// select per scegliere paese / regione: lo mettiamo a sinistra del bottone
+// Select per scegliere regione
 const select = document.createElement('select');
 select.style.position = 'absolute';
 select.style.top = '10px';
@@ -44,7 +45,7 @@ select.style.fontFamily = 'sans-serif';
 select.style.fontSize = '13px';
 document.body.appendChild(select);
 
-// label per la select (opzionale)
+// Label opzionale select
 const selectLabel = document.createElement('label');
 selectLabel.textContent = 'Regione:';
 selectLabel.style.position = 'absolute';
@@ -56,7 +57,7 @@ selectLabel.style.fontFamily = 'sans-serif';
 selectLabel.style.fontSize = '13px';
 document.body.appendChild(selectLabel);
 
-// info ultimo aggiornamento
+// Info ultimo aggiornamento
 const info = document.createElement('div');
 info.style.position = 'absolute';
 info.style.top = '10px';
@@ -73,7 +74,6 @@ document.body.appendChild(info);
 
 let lastRequestTime = 0;
 const MIN_INTERVAL_MS = 60_000;
-
 let last429Time = 0;
 const COOLDOWN_MS = 5 * 60_000;
 
@@ -83,7 +83,7 @@ function formatTime(date) {
 
 const planeMarkers = {};
 
-// calcola bearing tra due punti (gradi)
+// Calcolo bearing tra due punti
 function computeBearing(lat1, lon1, lat2, lon2) {
   const toRad = deg => deg * Math.PI / 180;
   const toDeg = rad => rad * 180 / Math.PI;
@@ -98,7 +98,8 @@ function computeBearing(lat1, lon1, lat2, lon2) {
   return (toDeg(θ) + 360) % 360;
 }
 
-function createPlaneIcon(deg, size = 28) {
+// Crea icona con immagine e rotazione
+function createPlaneIcon(imgPath, deg, size = 28) {
   const style = `
     transform: rotate(${deg}deg);
     width: ${size}px;
@@ -108,7 +109,7 @@ function createPlaneIcon(deg, size = 28) {
     padding: 0;
     -webkit-backface-visibility: hidden;
   `;
-  const html = `<img src="/plane.png" style="${style}" alt="plane" />`;
+  const html = `<img src="${imgPath}" style="${style}" alt="plane" />`;
   return L.divIcon({
     className: 'plane-divicon',
     html,
@@ -117,6 +118,18 @@ function createPlaneIcon(deg, size = 28) {
   });
 }
 
+// Scegli immagine in base all'altitudine
+function choosePlaneImage(baroAltitude) {
+  if (baroAltitude == null || Number.isNaN(baroAltitude)) return '/plane2.png'; // verde se non noto
+
+  const alt = Number(baroAltitude);
+  if (alt < 100) return '/plane2.png';   // verde
+  if (alt > 10000) return '/plane1.png'; // rosso
+  if (alt < 1000) return '/plane.png';   // giallo
+  return '/plane.png';                    // default
+}
+
+// Aggiorna o crea marker aereo
 function updateOrCreatePlane(state, destinationLatLon = null) {
   const icao24 = state[0];
   const callsign = state[1] ? state[1].trim() : "N/A";
@@ -138,37 +151,56 @@ function updateOrCreatePlane(state, destinationLatLon = null) {
     bearing = 0;
   }
 
+  const img = choosePlaneImage(baroAltitude);
+
   if (planeMarkers[icao24]) {
     const m = planeMarkers[icao24];
     m.setLatLng([lat, lon]);
-    m.setIcon(createPlaneIcon(bearing, 34));
+    m.setIcon(createPlaneIcon(img, bearing, 34));
+
     const popup = m.getPopup();
     if (popup) {
       popup.setContent(`
         <b>${callsign}</b><br/>
         ICAO24: ${icao24}<br/>
         Paese: ${originCountry}<br/>
-        Altitudine (baro): ${baroAltitude ? baroAltitude.toFixed(0) + " m" : "N/D"}<br/>
+        Altitudine (baro): ${baroAltitude ? Math.round(baroAltitude) + " m" : "N/D"}<br/>
         Velocità: ${velocity ? (velocity * 3.6).toFixed(0) + " km/h" : "N/D"}<br/>
-        Direzione (°): ${bearing ? bearing.toFixed(0) : 'N/D'}
+        Direzione (°): ${bearing ? Math.round(bearing) : 'N/D'}
       `);
     }
+
+    const tt = m.getTooltip();
+    if (tt) {
+      tt.setContent(callsign);
+    } else {
+      m.bindTooltip(callsign, { permanent: false, direction: 'top', offset: [0, -10] });
+      m.on('mouseover', e => e.target.openTooltip());
+      m.on('mouseout', e => e.target.closeTooltip());
+    }
+
   } else {
-    const icon = createPlaneIcon(bearing, 34);
+    const icon = createPlaneIcon(img, bearing, 34);
     const marker = L.marker([lat, lon], { icon }).addTo(planesLayer);
+
     marker.bindPopup(`
       <b>${callsign}</b><br/>
       ICAO24: ${icao24}<br/>
       Paese: ${originCountry}<br/>
-      Altitudine (baro): ${baroAltitude ? baroAltitude.toFixed(0) + " m" : "N/D"}<br/>
+      Altitudine (baro): ${baroAltitude ? Math.round(baroAltitude) + " m" : "N/D"}<br/>
       Velocità: ${velocity ? (velocity * 3.6).toFixed(0) + " km/h" : "N/D"}<br/>
-      Direzione (°): ${bearing ? bearing.toFixed(0) : 'N/D'}
+      Direzione (°): ${bearing ? Math.round(bearing) : 'N/D'}
     `);
+
+    marker.bindTooltip(callsign, { permanent: false, direction: 'top', offset: [0, -10] });
+    marker.on('mouseover', e => e.target.openTooltip());
+    marker.on('mouseout', e => e.target.closeTooltip());
+
     planeMarkers[icao24] = marker;
   }
 }
 
-// MAPPA di regioni -> URL (bbox)
+// Mappa regioni -> URL
 const REGION_URLS = {
   'all': `https://opensky-network.org/api/states/all`,
   'europe': `https://opensky-network.org/api/states/all?lamin=34.0&lomin=-25.0&lamax=72.0&lomax=45.0`,
@@ -182,7 +214,7 @@ const REGION_URLS = {
   'usa': `https://opensky-network.org/api/states/all?lamin=18.0&lomin=-170.0&lamax=72.0&lomax=-30.0`
 };
 
-// popolare la select con le opzioni
+// Popola select
 function populateSelect() {
   const entries = [
     { key: 'all', label: 'Tutto (global)' },
@@ -204,113 +236,65 @@ function populateSelect() {
     select.appendChild(option);
   }
 
-  // valore iniziale: Italia
   select.value = 'italy';
 }
 populateSelect();
 
-// variabile che contiene l'URL attuale da usare per fetch
 let currentFetchUrl = REGION_URLS[select.value] || REGION_URLS['italy'];
 
-// quando cambio la select, aggiorno l'URL corrente (non faccio fetch automatico, ma puoi volerlo)
+// Cambio select
 select.addEventListener('change', () => {
   const key = select.value;
   if (REGION_URLS[key]) {
     currentFetchUrl = REGION_URLS[key];
-    console.log('Selezionato:', key, '->', currentFetchUrl);
-    // opzionale: cambiare centro/zoom della mappa in base alla regione selezionata
     switch (key) {
-      case 'italy':
-        map.setView([42.5, 12.5], 5);
-        break;
-      case 'europe':
-        map.setView([54.0, 10.0], 4);
-        break;
-      case 'france':
-        map.setView([46.5, 2.5], 5);
-        break;
-      case 'uk':
-        map.setView([54.0, -2.0], 5);
-        break;
-      case 'germany':
-        map.setView([51.0, 10.0], 5);
-        break;
-      case 'spain':
-        map.setView([40.0, -3.5], 5);
-        break;
-      case 'japan':
-        map.setView([36.0, 138.0], 5);
-        break;
-      case 'china':
-        map.setView([35.0, 103.0], 4);
-        break;
-      case 'usa':
-        map.setView([39.0, -98.0], 4);
-        break;
-      default:
-        map.setView([42.5, 12.5], 5);
+      case 'italy': map.setView([42.5, 12.5], 5); break;
+      case 'europe': map.setView([54.0, 10.0], 4); break;
+      case 'france': map.setView([46.5, 2.5], 5); break;
+      case 'uk': map.setView([54.0, -2.0], 5); break;
+      case 'germany': map.setView([51.0, 10.0], 5); break;
+      case 'spain': map.setView([40.0, -3.5], 5); break;
+      case 'japan': map.setView([36.0, 138.0], 5); break;
+      case 'china': map.setView([35.0, 103.0], 4); break;
+      case 'usa': map.setView([39.0, -98.0], 4); break;
+      default: map.setView([42.5, 12.5], 5);
     }
-  } else {
-    console.warn('Regione non trovata:', key);
   }
+  loadPlanes();
 });
 
-// Funzione che carica gli aerei usando currentFetchUrl
+// Carica aerei
 async function loadPlanes() {
   const now = Date.now();
 
   if (last429Time && now - last429Time < COOLDOWN_MS) {
     const remaining = COOLDOWN_MS - (now - last429Time);
-    const sec = Math.ceil(remaining / 1000);
-    alert(`OpenSky ti ha limitato. Riprova tra circa ${sec} secondi.`);
+    alert(`OpenSky ti ha limitato. Riprova tra circa ${Math.ceil(remaining/1000)} secondi.`);
     return;
   }
 
-  const diff = now - lastRequestTime;
-  if (diff < MIN_INTERVAL_MS) {
-    const sec = Math.ceil((MIN_INTERVAL_MS - diff) / 1000);
-    console.log(`Aspetta ancora ${sec}s prima di aggiornare di nuovo`);
-    return;
-  }
-
+  if (now - lastRequestTime < MIN_INTERVAL_MS) return;
   lastRequestTime = now;
 
-  // URL da usare
   const url = currentFetchUrl || REGION_URLS['italy'];
 
   try {
     const res = await fetch(url);
-
     if (!res.ok) {
-      const text = await res.text();
-      console.error('Errore HTTP OpenSky:', res.status, res.statusText, text);
-
-      if (res.status === 429) {
-        last429Time = Date.now();
-        alert("OpenSky dice: 'Too Many Requests'. Ti ha messo in rate limit.\nAspetta qualche minuto e poi riprova.");
-      }
+      if (res.status === 429) last429Time = Date.now();
       return;
     }
 
     const body = await res.json();
-    const states = body.states;
-    if (!states) {
-      console.warn('Nessun aereo ricevuto da OpenSky');
-      return;
-    }
-
+    const states = body.states || [];
     const seen = new Set();
 
     for (const state of states) {
       const icao24 = state[0];
       seen.add(icao24);
-
-      // al momento non abbiamo la destinazione reale; lasciamo null
-      const destinationLatLon = null;
-      updateOrCreatePlane(state, destinationLatLon);
+      updateOrCreatePlane(state, null);
     }
 
-    // rimuovo marker non più presenti
     for (const key of Object.keys(planeMarkers)) {
       if (!seen.has(key)) {
         planesLayer.removeLayer(planeMarkers[key]);
@@ -318,19 +302,14 @@ async function loadPlanes() {
       }
     }
 
-    console.log(`Aggiornamento riuscito, aerei: ${states.length}`);
     info.textContent = `Ultimo aggiornamento: ${formatTime(new Date())}`;
   } catch (err) {
     console.error('Errore fetch OpenSky:', err);
   }
 }
 
-// caricamento iniziale
-loadPlanes();
-
-// click sul bottone aggiorna con l'URL selezionato
+// Eventi
 btn.addEventListener('click', loadPlanes);
 
-select.addEventListener('change', () => {
-  loadPlanes();
-});
+// Primo caricamento
+loadPlanes();
