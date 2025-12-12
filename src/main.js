@@ -72,6 +72,37 @@ info.style.fontSize = '12px';
 info.textContent = 'Ultimo aggiornamento: mai';
 document.body.appendChild(info);
 
+// ==========================
+//    FILTRO COLORI
+// ==========================
+const filterBox = document.createElement('div');
+filterBox.className = 'filter-box';
+filterBox.innerHTML = `
+  <div class="filter-title">Filtra quota aerei</div>
+  <div class="filter-group">
+    <div class="filter-btn active" data-filter="all">Tutti</div>
+    <div class="filter-btn" data-filter="altitude">Alta</div>
+    <div class="filter-btn" data-filter="yellow">Bassa</div>
+    <div class="filter-btn" data-filter="green">Terra</div>
+  </div>
+`;
+document.body.appendChild(filterBox);
+
+let activeFilter = "all";
+
+// gestione click filtri
+filterBox.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    filterBox.querySelectorAll(".filter-btn")
+      .forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeFilter = btn.dataset.filter;
+
+    await loadPlanes();
+    applyFilter();
+  });
+});
+
 let lastRequestTime = 0;
 const MIN_INTERVAL_MS = 60_000;
 let last429Time = 0;
@@ -82,6 +113,35 @@ function formatTime(date) {
 }
 
 const planeMarkers = {};
+
+// aiuta a determinare colore
+function getColorCategoryFromImgPath(imgPath) {
+  if (!imgPath) return "yellow";
+  if (imgPath.includes("plane1")) return "red";
+  if (imgPath.includes("plane2")) return "green";
+  return "yellow";
+}
+
+// applica il filtro a tutti i marker
+function applyFilter() {
+  Object.values(planeMarkers).forEach(marker => {
+    const alt = marker._altitude;
+    const col = marker._altColor;
+
+    let show = false;
+
+    if (activeFilter === "all") {
+      show = true;
+    } else if (activeFilter === "altitude") {
+      show = alt != null && alt > 10000;
+    } else {
+      show = (col === activeFilter);
+    }
+
+    if (show) marker.addTo(planesLayer);
+    else planesLayer.removeLayer(marker);
+  });
+}
 
 // Calcolo bearing tra due punti
 function computeBearing(lat1, lon1, lat2, lon2) {
@@ -152,11 +212,15 @@ function updateOrCreatePlane(state, destinationLatLon = null) {
   }
 
   const img = choosePlaneImage(baroAltitude);
+  const colorCategory = getColorCategoryFromImgPath(img);
 
   if (planeMarkers[icao24]) {
     const m = planeMarkers[icao24];
     m.setLatLng([lat, lon]);
     m.setIcon(createPlaneIcon(img, bearing, 34));
+
+    m._altitude = baroAltitude;
+    m._altColor = colorCategory;
 
     const popup = m.getPopup();
     if (popup) {
@@ -182,6 +246,9 @@ function updateOrCreatePlane(state, destinationLatLon = null) {
   } else {
     const icon = createPlaneIcon(img, bearing, 34);
     const marker = L.marker([lat, lon], { icon }).addTo(planesLayer);
+
+    marker._altitude = baroAltitude;
+    marker._altColor = colorCategory;
 
     marker.bindPopup(`
       <b>${callsign}</b><br/>
@@ -303,6 +370,9 @@ async function loadPlanes() {
     }
 
     info.textContent = `Ultimo aggiornamento: ${formatTime(new Date())}`;
+
+    applyFilter();
+
   } catch (err) {
     console.error('Errore fetch OpenSky:', err);
   }

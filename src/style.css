@@ -1,1 +1,43 @@
-#map { height: 895px; }
+#map { 
+  height: 895px; 
+}
+
+/* --- Fake DaisyUI Toggle Buttons --- */
+.filter-box {
+  position: absolute;
+  top: 50px;
+  right: 10px;   /* spostato a destra */
+  z-index: 2000;
+  background: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-family: sans-serif;
+}
+
+.filter-title {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.filter-group {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  font-size: 13px;
+  background: #f7f7f7;
+  transition: 0.2s;
+}
+
+.filter-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #1d4ed8;
+}
