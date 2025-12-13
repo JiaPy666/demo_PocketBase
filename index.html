@@ -8,14 +8,30 @@
      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
      crossorigin=""/>
-     <!-- Make sure you put this AFTER Leaflet's CSS -->
- <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
   </head>
   <body>
     <div id="app">
        <div id="map"></div>
+       
+       <div id="region-selector-box" class="filter-box region-box">
+          <div class="filter-title">Seleziona Regione/Paese</div>
+          <div id="region-list" class="region-list">
+            </div>
+       </div>
+       
+       <div id="altitude-filter-box" class="filter-box altitude-box">
+          <div class="filter-title">Filtra quota aerei</div>
+          <div class="filter-group">
+            <div class="filter-btn active" data-filter="all">Tutti</div>
+            <div class="filter-btn" data-filter="red">Alta</div>
+            <div class="filter-btn" data-filter="yellow">Bassa</div>
+            <div class="filter-btn" data-filter="green">Terra</div>
+          </div>
+       </div>
+       
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

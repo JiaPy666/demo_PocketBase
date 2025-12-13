@@ -2,11 +2,20 @@
   height: 895px; 
 }
 
-/* --- Fake DaisyUI Toggle Buttons --- */
+/* --- Stili Base Controlli Mappa (Aggiorna, Info) --- */
+.map-control-btn, .map-control-info, .map-control-label {
+    position: absolute;
+    z-index: 1000;
+    font-family: sans-serif;
+    font-size: 13px;
+    top: 10px;
+}
+/* ... (altri stili di base non modificati) ... */
+
+/* --- Stili Pannelli Filtro Generici --- */
 .filter-box {
   position: absolute;
-  top: 50px;
-  right: 10px;   /* spostato a destra */
+  right: 10px;   
   z-index: 2000;
   background: white;
   padding: 10px 14px;
@@ -21,6 +30,59 @@
   margin-bottom: 6px;
 }
 
+/* --- POSIZIONAMENTO DEI DUE PANNELLI --- */
+.region-box {
+    top: 10px; /* Il selettore regioni è in cima */
+}
+
+.altitude-box {
+    /* Posizionato sotto il selettore regioni. 
+       Assumiamo che il region-box abbia altezza max di ~400px + 50px di padding/margine */
+    top: 470px; 
+}
+
+/* --- Stili Selettore Regione (region-box) --- */
+.region-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px; 
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.region-btn {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  font-size: 13px;
+  background: #f7f7f7;
+  transition: 0.2s;
+  min-width: 150px;
+}
+
+.region-btn:hover {
+  background: #e0e0e0;
+}
+
+.region-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #1d4ed8;
+}
+
+.region-btn img {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+/* --- Stili Filtro Altitudine (altitude-box) --- */
 .filter-group {
   display: flex;
   gap: 6px;
