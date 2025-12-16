@@ -1,4 +1,3 @@
-
 export const loadFromLocalStorage = (key) => {
     const local = localStorage.getItem(key);
     if (!local) return null;
