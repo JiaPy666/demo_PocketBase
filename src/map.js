@@ -2,7 +2,7 @@
 // Logica Mappa Leaflet, UI, Filtri e Visualizzazione dati DA LOCALSTORAGE
 
 import { loadFromLocalStorage } from './localstorage.js';
-import { KEY } from './data_fetcher.js'; // Chiave per localStorage ('opensky')
+import { KEY } from './dati_carica.js'; // Chiave per localStorage ('opensky') - AGGIORNATO
 
 // --- VARIABILI GLOBALI LEAFLET E STATO ---
 const map = L.map('map').setView([42.5, 12.5], 5); // Inizializzazione mappa con vista sull'Italia

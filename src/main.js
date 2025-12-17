@@ -1,31 +1,26 @@
 import './style.css';
-// Logica PocketBase/Sync: Avvia il loop (Fetch -> LocalStorage -> PocketBase)
 import { startUpdateScheduler } from './dati_carica.js'; 
-// Logica Mappa: Inizializza UI e visualizza i dati DA LOCALSTORAGE
 import { initializeMapAndUI, loadPlanesFromLocalStorage } from './map.js'; 
 
-// Intervalli: Allineati a 70 secondi come richiesto.
-const MAP_UPDATE_INTERVAL_MS = 70 * 1000;
+// Nuovo intervallo: 60 secondi (1 minuto) per l'aggiornamento della MAPPA dal LocalStorage
+const MAP_RENDER_INTERVAL_MS = 60 * 1000; 
 
 // Funzione principale che inizializza tutto
 async function init() {
     console.log("Inizio inizializzazione applicazione...");
     
-    // 1. Inizializza Mappa e UI (deve essere fatto per primo)
     initializeMapAndUI(); 
 
-    // 2. Avvia lo scheduler di aggiornamento dati (fetch, save, sync). 
-    // Include la prima esecuzione.
+    // Avvia il loop Fetch -> PocketBase -> LocalStorage (ogni 70s)
     startUpdateScheduler(); 
     
-    // 3. Esegue il primo caricamento degli aerei sulla mappa da LocalStorage.
+    // Carica subito i dati appena fetchati (dopo il primo fetch del scheduler)
     await loadPlanesFromLocalStorage(); 
     
-    // 4. Avvia il loop di aggiornamento della mappa (ogni 70s)
-    // Aggiorna la mappa prelevando i dati freschi salvati nello Storage dal loop di sincronizzazione.
-    setInterval(loadPlanesFromLocalStorage, MAP_UPDATE_INTERVAL_MS); 
+    // Avvia il loop di aggiornamento della Mappa dal LocalStorage (ogni 60s)
+    setInterval(loadPlanesFromLocalStorage, MAP_RENDER_INTERVAL_MS); 
     
-    console.log("Applicazione inizializzata. Due loop attivi: Dati/Sync e Mappa/Visualizzazione.");
+    console.log(`Aggiornamento mappa avviato ogni ${MAP_RENDER_INTERVAL_MS / 1000} secondi (lettura da LocalStorage).`);
 }
 
 init();

@@ -1,6 +1,6 @@
 import PocketBase from 'pocketbase';
 
-const pb = new PocketBase('http://127.0.0.1:8090');
+const pb = new PocketBase('http://127.0.0.1:8090/');
 
 const ADMIN_EMAIL = 'admin@admin.it'; 
 const ADMIN_PASSWORD = 'admin12345'; 

@@ -2,33 +2,35 @@ import { saveToLocalStorage } from './localstorage.js';
 
 // URL aggiornato a OpenSky Network
 const URL = 'https://opensky-network.org/api/states/all';
-const KEY = 'opensky'; 
+// Non serve più la KEY qui se non si salva direttamente
+// const KEY = 'opensky'; 
 
-export async function fetchAndStoreData() {
+export async function fetchOpenSkyData() {
     console.log("Inizio recupero dati OpenSky.");
     try {
         const response = await fetch(URL);
         if (!response.ok) {
             console.error(`Errore HTTP durante il fetch: ${response.status}`);
-            return false;
+            return null; // Ritorna null in caso di errore
         }
         
         const data = await response.json();
-        // I dati OpenSky contengono l'array 'states'
+        // Ritorna l'oggetto dati completo
         if (!data || !data.states || data.states.length === 0) {
             console.warn("Dati OpenSky non validi o stati aeromobili mancanti.");
-            return false;
+            return null;
         }
         
-        // Salva l'oggetto dati completo
-        saveToLocalStorage(KEY, data);
-        console.log(`✅ Dati OpenSky (${data.states.length} aeromobili) salvati nel localStorage.`);
-        return true;
+        console.log(`✅ Dati OpenSky (${data.states.length} aeromobili) recuperati.`);
+        return data; // Ritorna l'oggetto dati
+        
 
     } catch (error) {
         console.error("ERRORE di rete o parsing durante il fetch OpenSky:", error);
-        return false;
+        return null;
     }
 }
 
-export { KEY };
+// Rimuovere l'esportazione di KEY da qui, spostata in dati_carica.js o localstorage.js se necessario.
+// La tengo in map.js per retrocompatibilità.
+// export { KEY };
